@@ -3,19 +3,21 @@ if (!Detector.webgl) Detector.addGetWebGLMessage();
 var gCamera, gOrbitControls, gScene, gRenderer;
 
 // Objects
-var gBoard; // Room meshes
+var gBoard;
+const BOARD_SCALE = 10;
 
 // Raycasting
 var gRaycaster = new THREE.Raycaster();
 var gMouse = new THREE.Vector2();
 
-// Settings
-var gParams = { // Maps the values of the GUI gParams to our variables
-    NUM_FLOORS: 8,
-    MEAN_VERTS_PERFLOOR: 9,
-    MEAN_FLOOR_HEIGHT: 10,
-    MEAN_FLOOR_SIZE: 20
-};
+// Colors
+const WOOD_COLOR = 0x876101;
+const WHITE_COLOR = 0xffffff;
+const LIGHT_YELLOW_COLOR = 0xffffbb;
+const DARK_NAVY_COLOR = 0x022244;
+const BLUE_COLOR = 0x0033ff;
+
+const USE_HELPERS = true;
 
 // Kick it off
 init();
@@ -41,7 +43,7 @@ function initRenderer() {
 // Sets gCamera as a perspective camera and its position
 function initCamera() {
     gCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-    gCamera.position.set(50, 100, 50); // y==200, z==200
+    gCamera.position.set(0, 7, 0); // y==200, z==200
 }
 
 // Sets gOrbitControls and its settings
@@ -57,21 +59,25 @@ function initOrbitControls() {
 
 // Adds a grid to gScene
 function initHelpers() {
-    var gridHelper = new THREE.GridHelper(100, 100, 0x0000ff, 0x808080);
+    var gridHelper = new THREE.GridHelper(10, 10, 0x0000ff, 0x808080);
     gScene.add(gridHelper);
-    var axesHelper = new THREE.AxesHelper(5);
-    gScene.add(axesHelper);
 }
 
 // Adds ambient and directional lighting to gScene
 function initLights() {
-    var light = new THREE.DirectionalLight(0x002288);
-    light.position.y = 20;
-    var lightHelper = new THREE.DirectionalLightHelper(light, 5);
-    gScene.add(lightHelper);
-    var light = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
-    var lightHelper = new THREE.HemisphereLightHelper(light, 5);
-    gScene.add(lightHelper);
+    var dirLight = new THREE.DirectionalLight(WHITE_COLOR);
+    dirLight.position.y = 20;
+    gScene.add(dirLight);
+
+    var hemiLight = new THREE.HemisphereLight(LIGHT_YELLOW_COLOR, DARK_NAVY_COLOR, 0.5);
+    gScene.add(hemiLight);
+
+    if (USE_HELPERS) {
+        var dirHelper = new THREE.DirectionalLightHelper(dirLight, 5);
+        gScene.add(dirHelper);
+        var hemiLight = new THREE.HemisphereLightHelper(hemiLight, 5);
+        gScene.add(hemiLight);
+    }
 }
 
 function initEventListeners() {
@@ -85,19 +91,130 @@ function init() {
     initRenderer();
     initCamera();
     initLights();
-    initHelpers();
+    if (USE_HELPERS)
+        initHelpers();
 
     initOrbitControls();
 
     initEventListeners();
 
+    addBoard();
+
+}
+
+// Game stuff
+function addBoard() {
     var objLoader = new THREE.OBJLoader();
     objLoader.setPath('../res/models/');
     objLoader.load('board.obj', (object) => {
         gBoard = object;
-        object.scale = object.scale.multiplyScalar(10);
-        gScene.add(object);
+        gBoard.name = "BoardGroup";
+        // Materials
+        var boardMaterial = new THREE.MeshPhongMaterial({
+            color: WOOD_COLOR,
+        });
+        var gridMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+        });
+
+        // Change names of gBoard's children
+        gBoard.getObjectByName("Grid_Grid.003").name = "Grid";
+        gBoard.getObjectByName("Board_Cube").name = "Board";
+        gBoard.getObjectByName("Foot_Circle.003").name = "Foot";
+
+        // Apply materials to all children
+        gBoard.traverse(function(child) {
+            if (child.name == "Grid") child.material = gridMaterial;
+            else child.material = boardMaterial;
+        });
+
+        // Scale the Board
+        gBoard.scale = gBoard.scale.multiplyScalar(BOARD_SCALE);
+        gBoard.updateMatrixWorld();
+        gScene.add(gBoard);
+
+        // Add nodes to grid
+        var grid = gBoard.getObjectByName("Grid");
+        var gridBox = new THREE.Box3().setFromObject(grid); // size: x: 4, y: 0, z: 4
+        var board = gBoard.getObjectByName("Board");
+        var boardBox = new THREE.Box3().setFromObject(board);
+        _addGridPoints(gridBox, boardBox);
+
+
     });
+
+    function _addGridPoints(gridBox, boardBox) {
+        var sphereGeometry = new THREE.SphereBufferGeometry(BOARD_SCALE / 300, 8, 8);
+        var basicMaterial = new THREE.MeshBasicMaterial({ color: BLUE_COLOR });
+        var gridPoints = new THREE.Group(); // group of meshes
+        gridPoints.name = "GridPoints";
+        gScene.add(gridPoints);
+
+        for (var i = 0; i < 19; i++) {
+            for (var j = 0; j < 19; j++) {
+                var gridPoint = new THREE.Mesh(sphereGeometry, basicMaterial);
+                gridPoint.position.x = i * (gridBox.max.x - gridBox.min.x) / 18 + gridBox.min.x;
+                gridPoint.position.y = boardBox.max.y;
+                gridPoint.position.z = j * (gridBox.max.z - gridBox.min.z) / 18 + gridBox.min.z;
+                gridPoint.visible = false;
+                gridPoint.name = i.toString() + "-" + j.toString();
+                _updatePointIfStarPoint();
+                gridPoints.add(gridPoint);
+            }
+        }
+
+        function _updatePointIfStarPoint() {
+            if ((i == 3 || i == 9 || i == 15) && (j == 3 || j == 9 || j == 15)) {
+                gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+                gridPoint.name += "-StarPoint";
+            }
+            // if(i == 3 && j == 3) {
+            //     gridPoint.name = "ULStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 9 && j == 3) {
+            //     gridPoint.name = "UMStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 15 && j == 3) {
+            //     gridPoint.name = "URStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 3 && j == 9) {
+            //     gridPoint.name = "MLStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 9 && j == 9) {
+            //     gridPoint.name = "MMStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 15 && j == 9) {
+            //     gridPoint.name = "MRStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 3 && j == 15) {
+            //     gridPoint.name = "LLStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 9 && j == 15) {
+            //     gridPoint.name = "LMStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+            // else if(i == 15 && j == 15) {
+            //     gridPoint.name = "LRStarPoint";
+            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
+            //     gridPoint.visible = false;
+            // }
+        }
+    }
 }
 
 // Render Loop
@@ -125,24 +242,14 @@ function onMouseMove(event) {
     gMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     gMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     gRaycaster.setFromCamera(gMouse, gCamera);
-    // update the picking ray with the gCamera and gMouse position
+    if (gBoard) { // if the board has been loaded
+        var gridPoints = gScene.getObjectByName("GridPoints");
+        var intersects = gRaycaster.intersectObjects(gridPoints.children);
+        if (intersects.length > 0) {
+            intersects.forEach(function(intersect) {
+                intersect.object.visible = true;
+            });
+        }
+    }
+
 }
-
-// function onDocumentKeyDown(event) {
-//     // update the picking ray with the gCamera and gMouse position
-
-//     var intersects = gRaycaster.intersectObjects(gScene.children);
-//     var keyCode = event.which;
-//     // Toggle rotation bool for meshes that we clicked
-//     if (keyCode == 68) {
-//         if (intersects.length > 0) {
-//             console.log("asds");
-//             intersects.forEach(function(intersect) {
-//                 if (intersect.object.type == 'Mesh') {
-//                     intersect.object.rotateY(Math.PI / 3);
-
-//                 }
-//             });
-//         }
-//     }
-// }
