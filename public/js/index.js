@@ -1,10 +1,22 @@
 if (!Detector.webgl) Detector.addGetWebGLMessage();
 // Globals
-var gCamera, gOrbitControls, gScene, gRenderer;
+var gCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+var gScene = new THREE.Scene();
+var gRenderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+var gOrbitControls = new THREE.OrbitControls(gCamera, gRenderer.domElement);
+var gObjLoader = new THREE.OBJLoader();
+gObjLoader.setPath('../res/models/');
 
 // Objects
 var gBoard;
+var gGridPoints = new THREE.Group();
+gGridPoints.name = "GridPoints";
+gScene.add(gGridPoints);
+
 const BOARD_SCALE = 10;
+var BOARD_HEIGHT;
 
 // Raycasting
 var gRaycaster = new THREE.Raycaster();
@@ -25,16 +37,12 @@ animate();
 
 // Sets gScene, background color, and fog
 function initScene() {
-    gScene = new THREE.Scene();
     gScene.background = new THREE.Color(0xcccccc);
     gScene.fog = new THREE.FogExp2(0xcccccc, 0.002);
 }
 
 // Sets gRenderer, its pixel ratio, size, and appends it to the doc body
 function initRenderer() {
-    gRenderer = new THREE.WebGLRenderer({
-        antialias: true
-    });
     gRenderer.setPixelRatio(window.devicePixelRatio);
     gRenderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(gRenderer.domElement);
@@ -42,13 +50,11 @@ function initRenderer() {
 
 // Sets gCamera as a perspective camera and its position
 function initCamera() {
-    gCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
     gCamera.position.set(0, 7, 0); // y==200, z==200
 }
 
 // Sets gOrbitControls and its settings
 function initOrbitControls() {
-    gOrbitControls = new THREE.OrbitControls(gCamera, gRenderer.domElement); // we are controlling the global gCamera and listening for orbit events from the canvas 
     gOrbitControls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
     gOrbitControls.dampingFactor = 0.3;
     gOrbitControls.screenSpacePanning = true;
@@ -98,15 +104,17 @@ function init() {
 
     initEventListeners();
 
-    addBoard();
-
+    loadBoardAsync();
+    // loadPieceAsync();
 }
 
 // Game stuff
-function addBoard() {
-    var objLoader = new THREE.OBJLoader();
-    objLoader.setPath('../res/models/');
-    objLoader.load('board.obj', (object) => {
+
+
+function loadBoardAsync() {
+    gObjLoader.load('board.obj', _onBoardLoad);
+
+    function _onBoardLoad(object) {
         gBoard = object;
         gBoard.name = "BoardGroup";
         // Materials
@@ -138,81 +146,57 @@ function addBoard() {
         var gridBox = new THREE.Box3().setFromObject(grid); // size: x: 4, y: 0, z: 4
         var board = gBoard.getObjectByName("Board");
         var boardBox = new THREE.Box3().setFromObject(board);
-        _addGridPoints(gridBox, boardBox);
+        BOARD_HEIGHT = boardBox.max.y;
+        __addGridPoints(gridBox, boardBox);
 
+        loadPieceAsync();
+    }
 
-    });
-
-    function _addGridPoints(gridBox, boardBox) {
-        var sphereGeometry = new THREE.SphereBufferGeometry(BOARD_SCALE / 300, 8, 8);
-        var basicMaterial = new THREE.MeshBasicMaterial({ color: BLUE_COLOR });
-        var gridPoints = new THREE.Group(); // group of meshes
-        gridPoints.name = "GridPoints";
-        gScene.add(gridPoints);
+    function __addGridPoints(gridBox, boardBox) {
+        var pointGeometry = new THREE.BoxBufferGeometry(BOARD_SCALE / 50, BOARD_SCALE / 50, BOARD_SCALE / 50);
+        var pointMaterial = new THREE.MeshBasicMaterial({ color: BLUE_COLOR });
 
         for (var i = 0; i < 19; i++) {
             for (var j = 0; j < 19; j++) {
-                var gridPoint = new THREE.Mesh(sphereGeometry, basicMaterial);
-                gridPoint.position.x = i * (gridBox.max.x - gridBox.min.x) / 18 + gridBox.min.x;
-                gridPoint.position.y = boardBox.max.y;
-                gridPoint.position.z = j * (gridBox.max.z - gridBox.min.z) / 18 + gridBox.min.z;
-                gridPoint.visible = false;
-                gridPoint.name = i.toString() + "-" + j.toString();
-                _updatePointIfStarPoint();
-                gridPoints.add(gridPoint);
+                var point = new THREE.Mesh(pointGeometry, pointMaterial);
+                point.position.x = i * (gridBox.max.x - gridBox.min.x) / 18 + gridBox.min.x;
+                point.position.y = boardBox.max.y;
+                point.position.z = j * (gridBox.max.z - gridBox.min.z) / 18 + gridBox.min.z;
+                point.layers.set(1);
+                point.name = i.toString() + "-" + j.toString();
+
+                // updates the point if it is a starpoint
+                // if ((i == 3 || i == 9 || i == 15) && (j == 3 || j == 9 || j == 15)) {
+                //     point.scale = point.scale.multiplyScalar(1.5);
+                //     point.name += "-StarPoint";
+                // }
+                gGridPoints.add(point);
             }
         }
+    }
 
-        function _updatePointIfStarPoint() {
-            if ((i == 3 || i == 9 || i == 15) && (j == 3 || j == 9 || j == 15)) {
-                gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-                gridPoint.name += "-StarPoint";
-            }
-            // if(i == 3 && j == 3) {
-            //     gridPoint.name = "ULStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 9 && j == 3) {
-            //     gridPoint.name = "UMStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 15 && j == 3) {
-            //     gridPoint.name = "URStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 3 && j == 9) {
-            //     gridPoint.name = "MLStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 9 && j == 9) {
-            //     gridPoint.name = "MMStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 15 && j == 9) {
-            //     gridPoint.name = "MRStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 3 && j == 15) {
-            //     gridPoint.name = "LLStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 9 && j == 15) {
-            //     gridPoint.name = "LMStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
-            // else if(i == 15 && j == 15) {
-            //     gridPoint.name = "LRStarPoint";
-            //     gridPoint.scale = gridPoint.scale.multiplyScalar(1.5);
-            //     gridPoint.visible = false;
-            // }
+}
+
+function loadPieceAsync() {
+    gObjLoader.load('piece.obj', (object) => {
+        piece = object.children[0];
+        console.log(piece);
+        piece.position.y = BOARD_HEIGHT + 0.01;
+        piece.scale = piece.scale.multiplyScalar(BOARD_SCALE);
+        gScene.add(piece);
+    });
+}
+
+function updateWorld() {
+    gGridPoints.traverse(function(child) {
+        child.layers.set(1);
+    });
+    if (typeof gBoard != "undefined") { // if the board has been loaded
+        gRaycaster.setFromCamera(gMouse, gCamera);
+        var intersects = gRaycaster.intersectObjects(gGridPoints.children);
+        if (intersects.length > 0) {
+            // console.log(intersects[0].object.name);
+            intersects[0].object.layers.set(0);
         }
     }
 }
@@ -222,6 +206,7 @@ function addBoard() {
 function animate() {
     requestAnimationFrame(animate); // Asynchronously calls animate function when the next repaint can happen IE when call stack is clear. 
     gOrbitControls.update(); // only required if gOrbitControls.enableDamping = true, or if gOrbitControls.autoRotate = true
+    updateWorld();
     render();
 }
 
@@ -241,15 +226,4 @@ function onWindowResize() {
 function onMouseMove(event) {
     gMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     gMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    gRaycaster.setFromCamera(gMouse, gCamera);
-    if (gBoard) { // if the board has been loaded
-        var gridPoints = gScene.getObjectByName("GridPoints");
-        var intersects = gRaycaster.intersectObjects(gridPoints.children);
-        if (intersects.length > 0) {
-            intersects.forEach(function(intersect) {
-                intersect.object.visible = true;
-            });
-        }
-    }
-
 }
