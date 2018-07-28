@@ -10,7 +10,7 @@ var gObjLoader = new THREE.OBJLoader();
 gObjLoader.setPath('../res/models/');
 
 // Objects
-var gBoard;
+var gBoard, gBlackPiece, gWhitePiece;
 var gGridPoints = new THREE.Group();
 gGridPoints.name = "GridPoints";
 gScene.add(gGridPoints);
@@ -25,11 +25,15 @@ var gMouse = new THREE.Vector2();
 // Colors
 const WOOD_COLOR = 0x876101;
 const WHITE_COLOR = 0xffffff;
+const BLACK_COLOR = 0x000000;
 const LIGHT_YELLOW_COLOR = 0xffffbb;
 const DARK_NAVY_COLOR = 0x022244;
 const BLUE_COLOR = 0x0033ff;
 
 const USE_HELPERS = true;
+
+// Game Logic
+var gGame = new Game();
 
 // Kick it off
 init();
@@ -89,6 +93,11 @@ function initLights() {
 function initEventListeners() {
     window.addEventListener('resize', onWindowResize, false); // false means event won't be executed in capturing phase
     window.addEventListener('mousemove', onMouseMove, false);
+    window.addEventListener('dblclick', onDblClick, false);
+}
+
+function initGame() {
+
 }
 
 function init() {
@@ -105,11 +114,11 @@ function init() {
     initEventListeners();
 
     loadBoardAsync();
-    // loadPieceAsync();
+
+    initGame();
 }
 
 // Game stuff
-
 
 function loadBoardAsync() {
     gObjLoader.load('board.obj', _onBoardLoad);
@@ -146,13 +155,13 @@ function loadBoardAsync() {
         var gridBox = new THREE.Box3().setFromObject(grid); // size: x: 4, y: 0, z: 4
         var board = gBoard.getObjectByName("Board");
         var boardBox = new THREE.Box3().setFromObject(board);
-        BOARD_HEIGHT = boardBox.max.y;
-        __addGridPoints(gridBox, boardBox);
+        BOARD_HEIGHT = boardBox.max.y + 0.01;
+        __addGridPoints(gridBox);
 
-        loadPieceAsync();
+        loadPiecesAsync();
     }
 
-    function __addGridPoints(gridBox, boardBox) {
+    function __addGridPoints(gridBox) {
         var pointGeometry = new THREE.BoxBufferGeometry(BOARD_SCALE / 50, BOARD_SCALE / 50, BOARD_SCALE / 50);
         var pointMaterial = new THREE.MeshBasicMaterial({ color: BLUE_COLOR });
 
@@ -160,7 +169,7 @@ function loadBoardAsync() {
             for (var j = 0; j < 19; j++) {
                 var point = new THREE.Mesh(pointGeometry, pointMaterial);
                 point.position.x = i * (gridBox.max.x - gridBox.min.x) / 18 + gridBox.min.x;
-                point.position.y = boardBox.max.y;
+                point.position.y = BOARD_HEIGHT;
                 point.position.z = j * (gridBox.max.z - gridBox.min.z) / 18 + gridBox.min.z;
                 point.layers.set(1);
                 point.name = i.toString() + "-" + j.toString();
@@ -177,15 +186,34 @@ function loadBoardAsync() {
 
 }
 
-function loadPieceAsync() {
+function loadPiecesAsync() {
     gObjLoader.load('piece.obj', (object) => {
-        piece = object.children[0];
-        console.log(piece);
+        var piece = object.children[0];
         piece.position.y = BOARD_HEIGHT + 0.01;
         piece.scale = piece.scale.multiplyScalar(BOARD_SCALE);
-        gScene.add(piece);
+
+        gWhitePiece = piece;
+        gScene.add(gWhitePiece);
+
+        gBlackPiece = piece.clone();
+        gScene.add(gBlackPiece);
+
+
+        var whiteMaterial = new THREE.MeshPhongMaterial({
+            color: WHITE_COLOR,
+            shininess: 125
+        });
+        gWhitePiece.material = whiteMaterial;
+
+        var blackMaterial = new THREE.MeshPhongMaterial({
+            color: BLACK_COLOR,
+            shininess: 250
+        });
+        gBlackPiece.material = blackMaterial;
     });
 }
+
+function updateGame() {}
 
 function updateWorld() {
     gGridPoints.traverse(function(child) {
@@ -195,7 +223,6 @@ function updateWorld() {
         gRaycaster.setFromCamera(gMouse, gCamera);
         var intersects = gRaycaster.intersectObjects(gGridPoints.children);
         if (intersects.length > 0) {
-            // console.log(intersects[0].object.name);
             intersects[0].object.layers.set(0);
         }
     }
@@ -206,7 +233,7 @@ function updateWorld() {
 function animate() {
     requestAnimationFrame(animate); // Asynchronously calls animate function when the next repaint can happen IE when call stack is clear. 
     gOrbitControls.update(); // only required if gOrbitControls.enableDamping = true, or if gOrbitControls.autoRotate = true
-    updateWorld();
+    // updateWorld();
     render();
 }
 
@@ -224,6 +251,53 @@ function onWindowResize() {
 }
 
 function onMouseMove(event) {
+    setMouse(event);
+    // gGridPoints.traverse(function(child) {
+    //     child.layers.set(1);
+    // });
+    if (typeof gBoard != "undefined") { // if the board has been loaded
+        gRaycaster.setFromCamera(gMouse, gCamera);
+        var intersects = gRaycaster.intersectObjects(gGridPoints.children);
+        if (intersects.length > 0) {
+            processHover(intersects[0]);
+        }
+    }
+}
+
+function onDblClick(event) {
+    setMouse(event);
+    if (typeof gBoard != "undefined") { // if the board has been loaded
+        gRaycaster.setFromCamera(gMouse, gCamera);
+        var intersects = gRaycaster.intersectObjects(gGridPoints.children);
+        if (intersects.length > 0) {
+            processClick(intersects[0]);
+        }
+    }
+}
+
+function processHover(intersected) {
+    if (typeof gWhitePiece != "undefined") {
+        gWhitePiece.position.copy(intersected.object.position);
+    }
+}
+
+function processClick(intersected) {
+    console.log(intersected.object.name);
+    var clickedPoint = _parseName(intersected.object.name);
+    console.log(clickedPoint);
+
+    function _parseName(name) {
+        var strArray = name.split("-");
+        var i = parseInt(strArray[0]);
+        var j = parseInt(strArray[1]);
+        return {
+            i: i,
+            j: j
+        }
+    }
+}
+
+function setMouse(event) {
     gMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     gMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
