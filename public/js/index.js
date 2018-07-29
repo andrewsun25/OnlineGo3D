@@ -1,43 +1,39 @@
 if (!Detector.webgl) Detector.addGetWebGLMessage();
-// Globals
-var gCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-var gScene = new THREE.Scene();
-var gRenderer = new THREE.WebGLRenderer({
-    antialias: true
-});
-var gOrbitControls = new THREE.OrbitControls(gCamera, gRenderer.domElement);
-var gObjLoader = new THREE.OBJLoader();
-gObjLoader.setPath('../res/models/');
-
-// Objects
-var gBoard, gBlackPiece, gWhitePiece;
-var gGridPoints = new THREE.Group();
-gGridPoints.name = "GridPoints";
-gScene.add(gGridPoints);
-
-const BOARD_SCALE = 10;
-var BOARD_HEIGHT;
-
-// Raycasting
-var gRaycaster = new THREE.Raycaster();
-var gMouse = new THREE.Vector2();
-
-// Colors
-const WOOD_COLOR = 0x876101;
-const WHITE_COLOR = 0xffffff;
-const BLACK_COLOR = 0x000000;
-const LIGHT_YELLOW_COLOR = 0xffffbb;
-const DARK_NAVY_COLOR = 0x022244;
-const BLUE_COLOR = 0x0033ff;
-
-const USE_HELPERS = true;
-
-// Game Logic
-var gGame = new Game();
 
 // Kick it off
+
 init();
 animate();
+
+// Render Loop
+
+function animate() {
+    requestAnimationFrame(animate); // Asynchronously calls animate function when the next repaint can happen IE when call stack is clear. 
+    gOrbitControls.update(); // only required if gOrbitControls.enableDamping = true, or if gOrbitControls.autoRotate = true
+    // updateWorld();
+    render();
+}
+
+function render() {
+    gRenderer.render(gScene, gCamera);
+}
+
+// Init
+
+function init() {
+    initScene();
+    initRenderer();
+    initCamera();
+    initLights();
+    if (USE_HELPERS)
+        initHelpers();
+
+    initOrbitControls();
+
+    initEventListeners();
+
+    loadBoardAsync();
+}
 
 // Sets gScene, background color, and fog
 function initScene() {
@@ -96,153 +92,7 @@ function initEventListeners() {
     window.addEventListener('dblclick', onDblClick, false);
 }
 
-function initGame() {
-
-}
-
-function init() {
-
-    initScene();
-    initRenderer();
-    initCamera();
-    initLights();
-    if (USE_HELPERS)
-        initHelpers();
-
-    initOrbitControls();
-
-    initEventListeners();
-
-    loadBoardAsync();
-
-    initGame();
-}
-
-// Game stuff
-
-function loadBoardAsync() {
-    gObjLoader.load('board.obj', _onBoardLoad);
-
-    function _onBoardLoad(object) {
-        gBoard = object;
-        gBoard.name = "BoardGroup";
-        // Materials
-        var boardMaterial = new THREE.MeshPhongMaterial({
-            color: WOOD_COLOR,
-        });
-        var gridMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-        });
-
-        // Change names of gBoard's children
-        gBoard.getObjectByName("Grid_Grid.003").name = "Grid";
-        gBoard.getObjectByName("Board_Cube").name = "Board";
-        gBoard.getObjectByName("Foot_Circle.003").name = "Foot";
-
-        // Apply materials to all children
-        gBoard.traverse(function(child) {
-            if (child.name == "Grid") child.material = gridMaterial;
-            else child.material = boardMaterial;
-        });
-
-        // Scale the Board
-        gBoard.scale = gBoard.scale.multiplyScalar(BOARD_SCALE);
-        gBoard.updateMatrixWorld();
-        gScene.add(gBoard);
-
-        // Add nodes to grid
-        var grid = gBoard.getObjectByName("Grid");
-        var gridBox = new THREE.Box3().setFromObject(grid); // size: x: 4, y: 0, z: 4
-        var board = gBoard.getObjectByName("Board");
-        var boardBox = new THREE.Box3().setFromObject(board);
-        BOARD_HEIGHT = boardBox.max.y + 0.01;
-        __addGridPoints(gridBox);
-
-        loadPiecesAsync();
-    }
-
-    function __addGridPoints(gridBox) {
-        var pointGeometry = new THREE.BoxBufferGeometry(BOARD_SCALE / 50, BOARD_SCALE / 50, BOARD_SCALE / 50);
-        var pointMaterial = new THREE.MeshBasicMaterial({ color: BLUE_COLOR });
-
-        for (var i = 0; i < 19; i++) {
-            for (var j = 0; j < 19; j++) {
-                var point = new THREE.Mesh(pointGeometry, pointMaterial);
-                point.position.x = i * (gridBox.max.x - gridBox.min.x) / 18 + gridBox.min.x;
-                point.position.y = BOARD_HEIGHT;
-                point.position.z = j * (gridBox.max.z - gridBox.min.z) / 18 + gridBox.min.z;
-                point.layers.set(1);
-                point.name = i.toString() + "-" + j.toString();
-
-                // updates the point if it is a starpoint
-                // if ((i == 3 || i == 9 || i == 15) && (j == 3 || j == 9 || j == 15)) {
-                //     point.scale = point.scale.multiplyScalar(1.5);
-                //     point.name += "-StarPoint";
-                // }
-                gGridPoints.add(point);
-            }
-        }
-    }
-
-}
-
-function loadPiecesAsync() {
-    gObjLoader.load('piece.obj', (object) => {
-        var piece = object.children[0];
-        piece.position.y = BOARD_HEIGHT + 0.01;
-        piece.scale = piece.scale.multiplyScalar(BOARD_SCALE);
-
-        gWhitePiece = piece;
-        gScene.add(gWhitePiece);
-
-        gBlackPiece = piece.clone();
-        gScene.add(gBlackPiece);
-
-
-        var whiteMaterial = new THREE.MeshPhongMaterial({
-            color: WHITE_COLOR,
-            shininess: 125
-        });
-        gWhitePiece.material = whiteMaterial;
-
-        var blackMaterial = new THREE.MeshPhongMaterial({
-            color: BLACK_COLOR,
-            shininess: 250
-        });
-        gBlackPiece.material = blackMaterial;
-    });
-}
-
-function updateGame() {}
-
-function updateWorld() {
-    gGridPoints.traverse(function(child) {
-        child.layers.set(1);
-    });
-    if (typeof gBoard != "undefined") { // if the board has been loaded
-        gRaycaster.setFromCamera(gMouse, gCamera);
-        var intersects = gRaycaster.intersectObjects(gGridPoints.children);
-        if (intersects.length > 0) {
-            intersects[0].object.layers.set(0);
-        }
-    }
-}
-
-// Render Loop
-
-function animate() {
-    requestAnimationFrame(animate); // Asynchronously calls animate function when the next repaint can happen IE when call stack is clear. 
-    gOrbitControls.update(); // only required if gOrbitControls.enableDamping = true, or if gOrbitControls.autoRotate = true
-    // updateWorld();
-    render();
-}
-
-function render() {
-    gRenderer.render(gScene, gCamera);
-}
-
-
-// Doc event listeners
+// Window event listeners
 
 function onWindowResize() {
     gCamera.aspect = window.innerWidth / window.innerHeight; // update aspect ratio for perspective gCamera
@@ -251,53 +101,87 @@ function onWindowResize() {
 }
 
 function onMouseMove(event) {
-    setMouse(event);
-    // gGridPoints.traverse(function(child) {
+    setMouse(event.clientX, event.clientY);
+    // gGridHitBoxes.traverse(function(child) {
     //     child.layers.set(1);
     // });
-    if (typeof gBoard != "undefined") { // if the board has been loaded
+    if (typeof gBoardGroup != "undefined") { // if the board has been loaded
         gRaycaster.setFromCamera(gMouse, gCamera);
-        var intersects = gRaycaster.intersectObjects(gGridPoints.children);
+        var intersects = gRaycaster.intersectObjects(gGridHitBoxes.children);
         if (intersects.length > 0) {
-            processHover(intersects[0]);
+            handleHover(intersects[0]);
         }
     }
 }
 
 function onDblClick(event) {
-    setMouse(event);
-    if (typeof gBoard != "undefined") { // if the board has been loaded
+    setMouse(event.clientX, event.clientY);
+    if (typeof gBoardGroup != "undefined") { // if the board has been loaded
         gRaycaster.setFromCamera(gMouse, gCamera);
-        var intersects = gRaycaster.intersectObjects(gGridPoints.children);
+        var intersects = gRaycaster.intersectObjects(gGridHitBoxes.children);
         if (intersects.length > 0) {
-            processClick(intersects[0]);
+            handleDblClick(intersects[0]);
         }
     }
 }
 
-function processHover(intersected) {
+// Window Event Handlers
+
+function handleHover(intersected) {
     if (typeof gWhitePiece != "undefined") {
-        gWhitePiece.position.copy(intersected.object.position);
+        gCursor.position.copy(intersected.object.position);
     }
 }
 
-function processClick(intersected) {
-    console.log(intersected.object.name);
-    var clickedPoint = _parseName(intersected.object.name);
-    console.log(clickedPoint);
+function handleDblClick(intersected) {
+    var clickedPoint = parseNameToPoint(intersected.object.name);
+    gGame.processMove(clickedPoint.i, clickedPoint.j);
+}
 
-    function _parseName(name) {
-        var strArray = name.split("-");
-        var i = parseInt(strArray[0]);
-        var j = parseInt(strArray[1]);
-        return {
-            i: i,
-            j: j
-        }
+// Event Bus communicates ebtween scene and game
+/*
+    @event: {
+        type: Name of event
+        target: object that dispatched event
+    }
+    @args: Object with user defined arguments
+*/
+EventBus.addEventListener('pointAddedEvent', (event, args) => {
+    console.log(event);
+    console.log(args);
+    var newPiece;
+    args.player == Game.WHITE ? newPiece = gWhitePiece.clone() : newPiece = gBlackPiece.clone();
+    newPiece.visible = true;
+    var gridHitBox = gGridHitBoxes.getObjectByName(parsePointToName(args.point));
+    newPiece.position.copy(gridHitBox.position);
+    gPieces.add(newPiece);
+});
+
+EventBus.addEventListener('pointTakenEvent', (event, args) => {
+    console.log("POINT TAKEN");
+});
+
+// Helpers
+
+function setMouse(clientX, clientY) {
+    gMouse.x = (clientX / window.innerWidth) * 2 - 1;
+    gMouse.y = -(clientY / window.innerHeight) * 2 + 1;
+}
+
+function parseNameToPoint(name) {
+    var strArray = name.split("-");
+    var i = parseInt(strArray[0]);
+    var j = parseInt(strArray[1]);
+    return {
+        i: i,
+        j: j
     }
 }
 
-function setMouse(event) {
-    gMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    gMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+function parsePointToName(point) {
+    var str = "";
+    str += point.i;
+    str += "-";
+    str += point.j;
+    return str;
 }
