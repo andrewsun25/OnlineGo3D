@@ -33,6 +33,7 @@ function init() {
     initEventListeners();
 
     loadBoardAsync();
+    loadPiecesAsync();
 }
 
 // Sets gScene, background color, and fog
@@ -146,18 +147,21 @@ function handleDblClick(intersected) {
     }
     @args: Object with user defined arguments
 */
-EventBus.addEventListener('pointAddedEvent', (event, args) => {
-    console.log(event);
-    console.log(args);
+gScene.handlePieceAdded = function(target, point, color) {
     var newPiece;
-    args.player == Game.WHITE ? newPiece = gWhitePiece.clone() : newPiece = gBlackPiece.clone();
+    color == Game.WHITE ? newPiece = gWhitePiece.clone() : newPiece = gBlackPiece.clone();
     newPiece.visible = true;
-    var gridHitBox = gGridHitBoxes.getObjectByName(parsePointToName(args.point));
+
+    var gridHitBox = gGridHitBoxes.getObjectByName(parsePointToName(point));
     newPiece.position.copy(gridHitBox.position);
     gPieces.add(newPiece);
+}
+
+EventBus.addEventListener('pieceAddedToScene', (event, args) => {
+    gScene.handlePieceAdded(event.target, args.point, args.color);
 });
 
-EventBus.addEventListener('pointTakenEvent', (event, args) => {
+EventBus.addEventListener('pieceCannotBeAddedToScene', (event, args) => {
     console.log("POINT TAKEN");
 });
 
