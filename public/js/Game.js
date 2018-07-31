@@ -1,60 +1,46 @@
-function Group(point) {
-    point.color == Game.WHITE ? this.type = "White Group" : this.type = "Black Group";
-    this.color = point.color;
-    this.liberties = 0; // equal to sum of this.points.liberties
+function Group(piece) {
+    piece.color == Game.WHITE ? this.type = "White Group" : this.type = "Black Group";
+    this.color = piece.color;
 
-    this.points = [];
-    (this.addPoint = function(point) {
-        if (point.color == this.color) {
-            this.points.push(point);
-            point.group = this;
-            // updateLiberties();
+    this.pieces = [];
+    (this.addPiece = function(piece) {
+        if (piece.color == this.color) {
+            this.pieces.push(piece);
+            piece.group = this;
         } else
-            console.log("Trying to add different colored point into group");
-    })(point);
+            console.log("Trying to add different colored piece into group");
+    }).call(this, piece);
 
     // appends all points of group to this group.
     this.absorbs = function(group) {
-        for (let point of group.points) {
-            this.addPoint(point);
+        for (let piece of group.pieces) {
+            this.addPiece(piece);
         }
     }
 
     // CONST method
     this.touches = function(group) {
-        for (let thisPoint of this.points) {
-            for (let thatPoint of group.points) {
-                if (thisPoint.touches(thatPoint)) {
+        for (let thisPiece of this.pieces) {
+            for (let thatPiece of group.pieces) {
+                if (thisPiece.touches(thatPiece)) {
                     return true;
                 }
             }
         }
         return false;
     }
-
-    this.resolveContact = function(group) {
-        console.log("resolveContact");
-    }
-
-    // function updateLiberties() {
-    //     this.liberties = 0;
-    //     for(let point of group.points) {
-    //         this.liberties += point.liberties;
-    //     }
-    // }
 }
 
-function Point(coord, color) {
-    color == Game.WHITE ? this.type = "White Point" : this.type = "Black Point";
+function Piece(coord, color) {
+    color == Game.WHITE ? this.type = "White Piece" : this.type = "Black Piece";
     this.coord = coord;
     this.color = color;
-    this.liberties = 4;
     this.group;
 
     // CONST method
-    this.touches = function(point) {
-        if (this.coord.topNeighbor().equals(point.coord) || this.coord.bottomNeighbor().equals(point.coord) ||
-            this.coord.leftNeighbor().equals(point.coord) || this.coord.rightNeighbor().equals(point.coord)) {
+    this.touches = function(piece) {
+        if (this.coord.topNeighbor().equals(piece.coord) || this.coord.bottomNeighbor().equals(piece.coord) ||
+            this.coord.leftNeighbor().equals(piece.coord) || this.coord.rightNeighbor().equals(piece.coord)) {
             return true;
         } else {
             return false;
@@ -92,83 +78,97 @@ function Game() {
     Game.OFF = 3;
 
     // Private
-    var currentColor = Game.BLACK; // if you omit var, JS looks up scope chain and creates it if not found.
-    var board = _empties([19, 19]);
-    var points = new Map();
-    var groups = new Set();
+    var _currentColor = Game.BLACK; // if you omit var, JS looks up scope chain and creates it if not found.
+    // var board = _empties([19, 19]);
+    var _board = new Map(); // string --> Piece objects
+    for (let i = 0; i < 19; i++) {
+        for (let j = 0; j < 19; j++) {
+            _board.set(parseCoordToString(i, j), null);
+        }
+    }
 
-
+    var _groups = new Set(); // set of Group objects
     // Public methods
     this.processMove = function(i, j) {
-        if (board[i][j] == Game.EMPTY) {
-            board[i][j] = currentColor;
+        if (_board.get(parseCoordToString(i, j)) === null) { //  If the _board @ given coordinate is empty
             var newCoord = new Coordinate(i, j);
-            var newPoint = new Point(newCoord, currentColor);
-            var newGroup = new Group(newPoint);
+            var newPiece = new Piece(newCoord, _currentColor);
 
+            // 1. Add newPiece to the _board
+            _board.set(parseCoordToString(i, j), newPiece);
 
+            var newGroup = new Group(newPiece);
 
-            _mergeIfTouching(groups, newGroup);
+            // 2. If the newGroup touches any existing friendly group, then append the old into the new and delete the old
+            _mergeIfTouchingFriendly(_groups, newGroup);
 
-            groups.add(newGroup); // add newGroup to exisiting groups
+            // 3.  Add the newGroup to exisiting _groups
+            _groups.add(newGroup);
 
-            _removeDeadFrom(groups);
+            // 4. Removes opponent's dead _groups or issues warning if current move is suicidal
+            _removeDead(_groups);
 
             EventBus.dispatch('pieceAddedToScene', this, {
-                point: {
+                addedAt: {
                     i: i,
                     j: j
                 },
-                color: currentColor
+                pieceColor: _currentColor
             });
 
-            currentColor = !currentColor; // converts current color into a boolean
+            // switches turns
+            _currentColor = !_currentColor; // converts current color into a boolean
         } else {
             EventBus.dispatch('pieceCannotBeAddedToScene');
         }
     }
 
     // Private methods
-    function _empties(dimensions) {
-        var array = [];
-        for (var i = 0; i < dimensions[0]; ++i) {
-            array.push(dimensions.length == 1 ? Game.EMPTY : _empties(dimensions.slice(1)));
-        }
-        return array;
-    }
 
-    function _removeDead(groups) {
-        groups.forEach(function(group) {
-            if (_countLiberties(group) < 1) {
-                groups.delete(group);
-            }
-        });
-    }
 
-    function _mergeIfTouching(groups, newGroup) {
+    function _mergeIfTouchingFriendly(groups, newGroup) {
         // Loop throguh existing groups
         groups.forEach(function(oldGroup) {
             // newGroup touches friendly group then newGroup absorbs the old one
             if (newGroup.touches(oldGroup) && newGroup.color == oldGroup.color) {
                 newGroup.absorbs(oldGroup); // adds all points from old to new
                 groups.delete(oldGroup);
-                console.log("Group touched friendly group");
-                console.log(oldGroup);
-                console.log(newGroup);
-                console.log(groups);
             }
         });
     }
 
+    function _removeDead(groups) {
+        for (let group of groups) {
+            if (_countLiberties(group) < 1) {
+                groups.delete(group);
+
+                var removedPoints = [];
+                for(let piece of group.pieces) {
+                    removedPoints.push({
+                        i: piece.coord.i,
+                        j: piece.coord.j
+                    });
+                }
+                for(let removedPoint of removedPoints) {
+                    _board.set(parsePointToString(removedPoint), null);
+                }
+                EventBus.dispatch('piecesRemovedFromScene', this, {
+                    removedPoints: removedPoints,
+                });
+            }
+        }
+    }
+
     function _countLiberties(group) {
-        var liberties = 4 * group.points.length;
-        groups.forEach(function(otherGroup) {
-            for (let otherPoint of otherGroup.points) {
-                for (let point of group.points) {
-                    liberties -= point.touches(otherPoint);
+        var liberties = 4 * group.pieces.length;
+        for (let [coordString, otherPiece] of _board) {
+            for (let piece of group.pieces) {
+                if (otherPiece != null && piece.touches(otherPiece)) {
+                    liberties--;
                 }
             }
-        })
+        }
+        return liberties;
     }
 }
 

@@ -10,7 +10,6 @@ animate();
 function animate() {
     requestAnimationFrame(animate); // Asynchronously calls animate function when the next repaint can happen IE when call stack is clear. 
     gOrbitControls.update(); // only required if gOrbitControls.enableDamping = true, or if gOrbitControls.autoRotate = true
-    // updateWorld();
     render();
 }
 
@@ -135,7 +134,7 @@ function handleHover(intersected) {
 }
 
 function handleDblClick(intersected) {
-    var clickedPoint = parseNameToPoint(intersected.object.name);
+    var clickedPoint = parseStringToPoint(intersected.object.name);
     gGame.processMove(clickedPoint.i, clickedPoint.j);
 }
 
@@ -147,45 +146,44 @@ function handleDblClick(intersected) {
     }
     @args: Object with user defined arguments
 */
-gScene.handlePieceAdded = function(target, point, color) {
+gScene.handlePieceAdded = function(target, addedAt, pieceColor) {
     var newPiece;
-    color == Game.WHITE ? newPiece = gWhitePiece.clone() : newPiece = gBlackPiece.clone();
+    if(pieceColor == Game.WHITE) {
+        newPiece = gWhitePiece.clone();
+        gCursor.material.color = gBlackPiece.material.color;
+    } else {
+        newPiece = gBlackPiece.clone();
+        gCursor.material.color = gWhitePiece.material.color;
+    }
     newPiece.visible = true;
+    newPiece.name = parsePointToString(addedAt);
 
-    var gridHitBox = gGridHitBoxes.getObjectByName(parsePointToName(point));
+    var gridHitBox = gGridHitBoxes.getObjectByName(parsePointToString(addedAt));
     newPiece.position.copy(gridHitBox.position);
     gPieces.add(newPiece);
 }
 
 EventBus.addEventListener('pieceAddedToScene', (event, args) => {
-    gScene.handlePieceAdded(event.target, args.point, args.color);
+    gScene.handlePieceAdded(event.target, args.addedAt, args.pieceColor);
 });
 
 EventBus.addEventListener('pieceCannotBeAddedToScene', (event, args) => {
     console.log("POINT TAKEN");
 });
 
+gScene.handlePiecesRemoved = function(target, removedPoints) {
+    for(let point of removedPoints) {
+        var removedPiece = gPieces.getObjectByName(parsePointToString(point));
+        gPieces.remove(removedPiece);
+    }
+}
+
+EventBus.addEventListener('piecesRemovedFromScene', (event, args) => {
+    gScene.handlePiecesRemoved(event.target, args.removedPoints);
+});
 // Helpers
 
 function setMouse(clientX, clientY) {
     gMouse.x = (clientX / window.innerWidth) * 2 - 1;
     gMouse.y = -(clientY / window.innerHeight) * 2 + 1;
-}
-
-function parseNameToPoint(name) {
-    var strArray = name.split("-");
-    var i = parseInt(strArray[0]);
-    var j = parseInt(strArray[1]);
-    return {
-        i: i,
-        j: j
-    }
-}
-
-function parsePointToName(point) {
-    var str = "";
-    str += point.i;
-    str += "-";
-    str += point.j;
-    return str;
 }
