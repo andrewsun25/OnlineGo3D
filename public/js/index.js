@@ -146,7 +146,8 @@ function handleDblClick(intersected) {
     }
     @args: Object with user defined arguments
 */
-gScene.handlePieceAdded = function(target, addedAt, pieceColor) {
+// Event 1: Piece added to Scene
+gScene.handlePieceAdded = function(target, coordString, pieceColor) {
     var newPiece;
     if(pieceColor == Game.WHITE) {
         newPiece = gWhitePiece.clone();
@@ -156,30 +157,37 @@ gScene.handlePieceAdded = function(target, addedAt, pieceColor) {
         gCursor.material.color = gWhitePiece.material.color;
     }
     newPiece.visible = true;
-    newPiece.name = parsePointToString(addedAt);
+    newPiece.name = coordString;
 
-    var gridHitBox = gGridHitBoxes.getObjectByName(parsePointToString(addedAt));
+    var gridHitBox = gGridHitBoxes.getObjectByName(coordString);
     newPiece.position.copy(gridHitBox.position);
     gPieces.add(newPiece);
 }
 
 EventBus.addEventListener('pieceAddedToScene', (event, args) => {
-    gScene.handlePieceAdded(event.target, args.addedAt, args.pieceColor);
+    gScene.handlePieceAdded(event.target, args.coordString, args.pieceColor);
 });
+
+// Event 2: Piece cannot be added to Scene
+gScene.handlePieceCannotBeAdded = function(target, reason) {
+    console.log(reason);
+}
 
 EventBus.addEventListener('pieceCannotBeAddedToScene', (event, args) => {
-    console.log("POINT TAKEN");
+    gScene.handlePieceCannotBeAdded(event.target, args.reason);
 });
 
-gScene.handlePiecesRemoved = function(target, removedPoints) {
-    for(let point of removedPoints) {
-        var removedPiece = gPieces.getObjectByName(parsePointToString(point));
+
+// Event 3: Piece removed from scene.
+gScene.handlePiecesRemoved = function(target, removedCoords) {
+    for(let coordString of removedCoords) {
+        var removedPiece = gPieces.getObjectByName(coordString);
         gPieces.remove(removedPiece);
     }
 }
 
 EventBus.addEventListener('piecesRemovedFromScene', (event, args) => {
-    gScene.handlePiecesRemoved(event.target, args.removedPoints);
+    gScene.handlePiecesRemoved(event.target, args.removedCoords);
 });
 // Helpers
 
