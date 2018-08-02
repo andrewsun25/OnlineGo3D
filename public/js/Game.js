@@ -1,92 +1,4 @@
-function Group(piece) {
-    piece.color === Game.WHITE ? this.type = "White Group" : this.type = "Black Group";
-    this.color = piece.color;
-
-    this.pieces = [];
-    (this.addPiece = function(piece) {
-        if (piece.color === this.color) {
-            this.pieces.push(piece);
-            piece.group = this;
-        } else
-            console.log("Trying to add different colored piece into group");
-    }).call(this, piece);
-
-    // CONST method
-    this.touches = function(group) {
-        for (let thisPiece of this.pieces) {
-            for (let thatPiece of group.pieces) {
-                if (thisPiece.touches(thatPiece)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-}
-
-function Piece(coord, color) {
-    if (!coord.inBounds) {
-        console.log("Piece is out of bounds");
-        return;
-    }
-    color === Game.WHITE ? this.type = "White Piece" : this.type = "Black Piece";
-    this.coord = coord;
-    this.color = color;
-    this.group = null;
-
-    // CONST method
-    this.touches = function(piece) {
-        if (!piece) {
-            return false;
-        } else if (this.coord.topNeighbor().equals(piece.coord) || this.coord.bottomNeighbor().equals(piece.coord) ||
-            this.coord.leftNeighbor().equals(piece.coord) || this.coord.rightNeighbor().equals(piece.coord)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    this.equals = function(piece) {
-        if(!piece) {
-            return false;
-        }
-        return this.coord.equals(piece.coord) && this.color == piece.color;
-    }
-}
-
-function Coordinate(i, j) {
-    this.i = i;
-    this.j = j;
-    if (j > 18 || i > 18 || j < 0 || i < 0) {
-        this.inBounds = false;
-    } else {
-        this.inBounds = true;
-    }
-
-    this.equals = function(coord) {
-        if(!coord) {
-            return false;
-        }
-        return this.i === coord.i && this.j === coord.j;
-    }
-
-    this.topNeighbor = function() {
-        return new Coordinate(i, j - 1);
-    }
-
-    this.bottomNeighbor = function() {
-        return new Coordinate(i, j + 1);
-    }
-
-    this.leftNeighbor = function() {
-        return new Coordinate(i - 1, j);
-    }
-
-    this.rightNeighbor = function() {
-        return new Coordinate(i + 1, j);
-    }
-}
-
+// Game --> Group --> Piece --> Coordinate. 
 function Game() {
 
     // Static
@@ -267,3 +179,92 @@ function Game() {
 
 // Object.assign(Game.prototype, THREE.EventDispatcher.prototype);
 Game.prototype.constructor = Game;
+
+function Group(piece) {
+    piece.color === Game.WHITE ? this.type = "White Group" : this.type = "Black Group";
+    this.color = piece.color;
+
+    this.pieces = [];
+    (this.addPiece = function(piece) {
+        if (piece.color === this.color) {
+            this.pieces.push(piece);
+            piece.group = this;
+        } else
+            console.log("Trying to add different colored piece into group");
+    }).call(this, piece);
+
+    // CONST method
+    this.touches = function(group) {
+        for (let thisPiece of this.pieces) {
+            for (let thatPiece of group.pieces) {
+                if (thisPiece.touches(thatPiece)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+
+function Piece(coord, color) {
+    if (!coord.inBounds) {
+        console.log("Piece is out of bounds");
+        return;
+    }
+    color === Game.WHITE ? this.type = "White Piece" : this.type = "Black Piece";
+    this.coord = coord;
+    this.color = color;
+    this.group = null;
+
+    // CONST method
+    this.touches = function(piece) {
+        if (!piece) {
+            return false;
+        } else if (this.coord.topNeighbor().equals(piece.coord) || this.coord.bottomNeighbor().equals(piece.coord) ||
+            this.coord.leftNeighbor().equals(piece.coord) || this.coord.rightNeighbor().equals(piece.coord)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    this.equals = function(piece) {
+        if(!piece) {
+            return false;
+        }
+        return this.coord.equals(piece.coord) && this.color == piece.color;
+    }
+}
+
+function Coordinate(i, j) {
+    this.i = i;
+    this.j = j;
+    if (j > 18 || i > 18 || j < 0 || i < 0) {
+        this.inBounds = false;
+    } else {
+        this.inBounds = true;
+    }
+
+    this.equals = function(coord) {
+        if(!coord) {
+            return false;
+        }
+        return this.i === coord.i && this.j === coord.j;
+    }
+
+    this.topNeighbor = function() {
+        return new Coordinate(i, j - 1);
+    }
+
+    this.bottomNeighbor = function() {
+        return new Coordinate(i, j + 1);
+    }
+
+    this.leftNeighbor = function() {
+        return new Coordinate(i - 1, j);
+    }
+
+    this.rightNeighbor = function() {
+        return new Coordinate(i + 1, j);
+    }
+}

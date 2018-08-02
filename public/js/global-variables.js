@@ -1,4 +1,4 @@
-//Colors
+// Colors
 const WOOD_COLOR = 0x876101;
 const WHITE_COLOR = 0xffffff;
 const BLACK_COLOR = 0x000000;

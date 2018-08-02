@@ -102,9 +102,6 @@ function onWindowResize() {
 
 function onMouseMove(event) {
     setMouse(event.clientX, event.clientY);
-    // gGridHitBoxes.traverse(function(child) {
-    //     child.layers.set(1);
-    // });
     if (typeof gBoardGroup != "undefined") { // if the board has been loaded
         gRaycaster.setFromCamera(gMouse, gCamera);
         var intersects = gRaycaster.intersectObjects(gGridHitBoxes.children);
@@ -189,6 +186,7 @@ gScene.handlePiecesRemoved = function(target, removedCoords) {
 EventBus.addEventListener('piecesRemovedFromScene', (event, args) => {
     gScene.handlePiecesRemoved(event.target, args.removedCoords);
 });
+
 // Helpers
 
 function setMouse(clientX, clientY) {
