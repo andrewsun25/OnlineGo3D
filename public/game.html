@@ -8,6 +8,8 @@
 </head>
 
 <body>
+    <div id="game"></div>
+    <script src="js/lib/socket.io.js"></script>
     <script src="js/three/three.js"></script>
     <script src="js/three/OBJLoader.js"></script>
     <!-- <script src="js/three/MTLLoader.js"></script> -->
@@ -21,7 +23,27 @@
     <script src="js/Game.js"></script>
     <script src="js/global-variables.js"></script>
     <script src="js/load-assets.js"></script>
-    <script src="js/index.js"></script>
+    <script src="js/View.js"></script>
+    <script src="js/main.js"></script>
+    <script type="text/javascript">
+    var socket = io();
+
+    var game;
+    var view;
+
+    socket.on('connect', function(data) {
+        game = new Game();
+        view = new View();
+        view.startDisplay();
+    });
+
+
+    socket.on('message', function(data) {
+        console.log(data);
+    });
+
+    socket.on('disconnect', function() {});
+    </script>
 </body>
 
 </html>
