@@ -9,10 +9,14 @@ router.get('/', function(req, res, next) {
 
 router.get('/create-game', function(req, res, next) {
 	res.sendFile('create-game.html', { root: root });
-})
+});
 
 router.get('/join-game', function(req, res, next) {
 	res.sendFile('join-game.html', { root: root });
-})
+});
+
+router.get('/game', function(req, res, next) {
+	res.sendFile('game.html', { root: root });
+});
 
 module.exports = router;

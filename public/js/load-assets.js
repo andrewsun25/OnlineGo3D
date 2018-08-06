@@ -13,6 +13,13 @@ function loadBoardAsync() {
         gBoardGroup.getObjectByName("Board_Cube").name = "BoardMesh";
         gBoardGroup.getObjectByName("Foot_Circle.003").name = "FootMesh";
 
+
+        // shadow business
+        var boardMesh = gBoardGroup.getObjectByName("BoardMesh");
+        boardMesh.castShadow = true;
+        var footMesh = gBoardGroup.getObjectByName("FootMesh");
+        footMesh.castShadow = true;
+        footMesh.receiveShadow = true;
         // Materials
         var boardMaterial = new THREE.MeshPhongMaterial({
             color: WOOD_COLOR,
@@ -32,10 +39,9 @@ function loadBoardAsync() {
         gBoardGroup.updateMatrixWorld();
 
         // Find the dimensions of the grid and board
-        var grid = gBoardGroup.getObjectByName("GridMesh");
-        var gridBox = new THREE.Box3().setFromObject(grid); // size: x: 4, y: 0, z: 4
-        var board = gBoardGroup.getObjectByName("BoardMesh");
-        var boardBox = new THREE.Box3().setFromObject(board);
+        var gridMesh = gBoardGroup.getObjectByName("GridMesh");
+        var gridBox = new THREE.Box3().setFromObject(gridMesh); // size: x: 4, y: 0, z: 4
+        var boardBox = new THREE.Box3().setFromObject(boardMesh);
 
         // Add grid hit boxes
 
@@ -58,6 +64,17 @@ function loadBoardAsync() {
                 gGridHitBoxes.add(hitBox);
             }
         }
+
+        // init gMat
+
+        var matGeometry = new THREE.PlaneBufferGeometry(BOARD_SCALE * 2, BOARD_SCALE * 2);
+        gMat.geometry = matGeometry;
+        gMat.material = gMaterials.matMeshMaterial;
+        gMat.receiveShadow = true;
+
+        gMat.rotateX(- Math.PI / 2);
+        var footBox = new THREE.Box3().setFromObject(footMesh);
+        gMat.position.y = footBox.min.y; - 0.01;
     } // _onBoardLoad
 }
 
@@ -86,3 +103,4 @@ function loadPiecesAsync() {
         gCursor.scale.copy(piece.scale);
     }
 }
+

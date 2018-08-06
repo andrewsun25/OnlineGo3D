@@ -6,6 +6,7 @@ const LIGHT_YELLOW_COLOR = 0xffffbb;
 const DARK_NAVY_COLOR = 0x022244;
 const BLUE_COLOR = 0x0033ff;
 const LIGHT_TEAL_COLOR = 0xaafffc;
+const DARK_GRAY_COLOR = 0x4f4e4e;
 
 // View
 var gCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
@@ -16,7 +17,7 @@ var gRenderer = new THREE.WebGLRenderer({
 var gOrbitControls = new THREE.OrbitControls(gCamera, gRenderer.domElement);
 
 // Settings
-const USE_HELPERS = true;
+const USE_HELPERS = false;
 
 // Raycasting
 var gRaycaster = new THREE.Raycaster();
@@ -51,8 +52,12 @@ gGridHitBoxes.name = "GridHitBoxes";
 gScene.add(gGridHitBoxes);
 
 var gPieces = new THREE.Group(); // current pieces on the baord
-gPieces.name = "Pieces"
+gPieces.name = "Pieces";
 gScene.add(gPieces);
+
+var gMat = new THREE.Mesh();
+gMat.name = "Mat";
+gScene.add(gMat);
 
 var gMaterials = {
     boardMeshMaterial: new THREE.MeshPhongMaterial({
@@ -79,8 +84,22 @@ var gMaterials = {
         side: THREE.FrontSide,
         transparent: true,
     }),
+    matMeshMaterial: new THREE.MeshPhongMaterial({
+        color: DARK_GRAY_COLOR,
+        side: THREE.DoubleSide
+    }),
 };
+
+var gSpotLight = new THREE.SpotLight(WHITE_COLOR, 0.4, 100);
+gSpotLight.castShadow = true;
+gScene.add(gSpotLight);
+
+if(USE_HELPERS) {
+    var spotLightHelper = new THREE.SpotLightHelper( gSpotLight, 10 );
+    gScene.add(spotLightHelper);
+    var cameraHelper = new THREE.CameraHelper( gSpotLight.shadow.camera );
+    gScene.add(cameraHelper);
+}
 
 // Game Logic
 var gGame = new Game();
-

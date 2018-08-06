@@ -13,6 +13,7 @@ function View() {
 
     function animate() {
         requestAnimationFrame(animate); // Asynchronously calls animate function when the next repaint can happen IE when call stack is clear. 
+        gSpotLight.position.copy(gCamera.position).sub(new THREE.Vector3(-1, -1, -1));
         gOrbitControls.update(); // only required if gOrbitControls.enableDamping = true, or if gOrbitControls.autoRotate = true
         render();
     }
@@ -50,6 +51,12 @@ function View() {
         gRenderer.setPixelRatio(window.devicePixelRatio);
         gRenderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(gRenderer.domElement);
+
+        gRenderer.shadowMap.enabled = true;
+        gRenderer.shadowCameraNear = gCamera.near;
+        gRenderer.shadowCameraFar = gCamera.far;
+        gRenderer.shadowCameraFov = gCamera.fov;
+
     }
 
     // Sets gCamera as a perspective camera and its position
@@ -64,7 +71,7 @@ function View() {
         gOrbitControls.screenSpacePanning = true;
         gOrbitControls.minDistance = 4; // closest we can dolly in to origin. 
         gOrbitControls.maxDistance = 11; // furtherest out we can get
-        gOrbitControls.maxPolarAngle = 2 * Math.PI; // angle by which we can deviate from y axis(in radians). Defines a cone.
+        gOrbitControls.maxPolarAngle = Math.PI / 2; // angle by which we can deviate from y axis(in radians). Defines a cone.
     }
 
     // Adds a grid to gScene
@@ -75,7 +82,7 @@ function View() {
 
     // Adds ambient and directional lighting to gScene
     function initLights() {
-        var dirLight = new THREE.DirectionalLight(WHITE_COLOR);
+        var dirLight = new THREE.DirectionalLight(WHITE_COLOR, 0.7);
         dirLight.position.y = 20;
         gScene.add(dirLight);
 

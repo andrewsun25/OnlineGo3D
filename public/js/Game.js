@@ -8,27 +8,27 @@ function Game() {
     // Private
     var _currentColor = Game.BLACK; // if you omit var, JS looks up scope chain and creates it if not found.
 
-    var _board = new Map(); // string --> Piece objects
+    var _board = new Map(); // coordinate strings --> Piece objects
     _board.setPiece = function(i, j, newPiece) {
         this.set(parseCoordToString(i, j), newPiece);
     }
     _board.getPiece = function(i, j) {
         return this.get(parseCoordToString(i, j));
     }
+    // init _board to 19x19 board of null
     for (let i = 0; i < 19; i++) {
         for (let j = 0; j < 19; j++) {
             _board.setPiece(i, j, null);
         }
     }
 
-    var _groups = new Set(); // set of Group objects
+    var _groups = new Set(); // set of Group objects representing groups of friendly black and white pieces
 
     var _lastCapturedPiece = null;
-    var _KO = false;
+    var _KO = false; // whether go applies
 
     // Public methods
-    // updates _board and _groups
-    this.processMove = function(i, j) {
+    this.processMove = function(i, j) {     // updates _board and _groups
         if (_board.getPiece(i, j) !== null) {
             EventBus.dispatch('pieceCannotBeAddedToScene', this, {
                 reason: "coord taken",
@@ -53,11 +53,11 @@ function Game() {
         _board.setPiece(i, j, newPiece);
 
         if (_groups.size > 0) {
-            // 2. Remove any opponent groups that we killed
+            // 2. Remove any opponent groups that we killed and return true if these existed a group to kill.
             var killedAGroup = _removeOpponentGroupsFromBoard();
         }
 
-        // 3. If we didn't kill a group and the last move was suicidal then that's incorrect
+        // 3. If we didn't kill a group and the current move is suicidal then that's illegal
         if (!killedAGroup && _lastMoveIsSuicidal(i, j)) {
             _board.setPiece(i, j, null); // remove the illegal move from _board
             EventBus.dispatch('pieceCannotBeAddedToScene', this, {
@@ -66,7 +66,7 @@ function Game() {
             return;
         }
 
-        // 4. Add a new group to the game that might absorb other groups
+        // 4. Add a new group based on the current move (piece) to the game that might absorb existing groups if they touch
         var newGroup = new Group(newPiece);
         _absorbOldGroupsIntoNew(_groups, newGroup);
 
@@ -75,24 +75,25 @@ function Game() {
             pieceColor: _currentColor
         });
 
-        // switches turns
+        // 5. switches turns
         _currentColor === Game.BLACK ? _currentColor = Game.WHITE : _currentColor = Game.BLACK;
     }
 
-    // returns whether or not a group was killed
+    // returns whether or not a group was killed. Kills all groups of opponent's that should be dead.
     function _removeOpponentGroupsFromBoard() {
         var killedAGroup = false;
         for (let group of _groups) {
-            // If group belongs to opponent and should be dead
+            // If group should be dead and group belongs to opponent
             if (_countLiberties(group) < 1 && group.color !== _currentColor) {
-                // Suicide rule
                 killedAGroup = true;
+
                 // KO rule
                 if(group.pieces.length === 1) {
                     _lastCapturedPiece = group.pieces[0];
                     _KO = true;
                 }
-                // 1. Delete group from _groups
+
+                // 1. Delete killed group from _groups
                 _groups.delete(group);
 
                 // 2. Remove the group's pieces from _board.
@@ -114,40 +115,47 @@ function Game() {
 
     // checks if the last move is suicidal without modifying _groups or _board.
     function _lastMoveIsSuicidal(i, j) {
+        // Simulate the new move and check if it causes a friendly group to die.
         var newCoord = new Coordinate(i, j);
         var newPiece = new Piece(newCoord, _currentColor);
 
         var newGroup = new Group(newPiece);
         var groupsCopy = new Set(_groups);
-        _absorbOldGroupsIntoNew(groupsCopy, newGroup); // false means don't modify _groups
+        _absorbOldGroupsIntoNew(groupsCopy, newGroup); 
 
         for (let group of groupsCopy) {
+            // if group is killed and the group is friendly
             if (_countLiberties(group) < 1 && _currentColor === group.color) {
                 return true;
             }
         }
+
         return false;
     }
 
     function _absorbOldGroupsIntoNew(groups, newGroup) {
         var friendlyGroups = Array.from(groups).filter((group) => group.color === newGroup.color);
+
         for (let friendlyGroup of friendlyGroups) {
-            // newGroup touches friendly group then newGroup absorbs the old one
+            // If newGroup touches friendly group then newGroup absorbs the old one
             if (newGroup.touches(friendlyGroup)) {
                 for (let piece of friendlyGroup.pieces) { // adds all points from old to new
                     newGroup.addPiece(piece);
                 }
-                groups.delete(friendlyGroup);
+                groups.delete(friendlyGroup); // newGroup now contains all the pieces of friendlyGroup so friendlyGroup is no longer necessary
             }
         }
+
         groups.add(newGroup);
     }
 
     function _countLiberties(group) {
         var liberties = 0;
+
         for (let piece of group.pieces) {
             liberties += _countLiberties(piece);
         }
+
         return liberties;
 
         function _countLiberties(piece) {
